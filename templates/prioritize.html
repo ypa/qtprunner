@@ -1,0 +1,91 @@
+$def with (actions)
+<!DOCTYPE html>
+
+<head>
+  <link rel="shortcut icon" href=/static/favicon.ico />
+  <title>QTP Runner | Prioritize</title>
+  <link rel="stylesheet" type="text/css" href="/templates/ex1.css" />
+  <script type='text/javascript' src='/scripts/jquery-1.5.js'></script>
+  <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jqueryui/1.8.1/jquery-ui.js"></script> 
+  <script type='text/javascript' src='/scripts/script.js'></script>
+</head>
+
+<body>
+
+<br />
+
+$code:
+   x = 0
+   ll = []
+<div id="message-box"> Waiting for sortation submission...</div> 
+<form id="dd-form" name="prioritize" method="post" action="prioritize">
+	<p> 
+		<input type="checkbox" value="1" name="autoSubmit" id="autoSubmit"  /> 
+		<label for="autoSubmit">Automatically submit on drop event</label> 
+	</p> 
+<ul id="sortable-list">
+
+$for action in actions:
+   $code:
+      x = x + 1
+      ll.append(action.priority)
+   <li title="$action.priority"> $action.priority | $action.action_name | $action.action_loc </li>
+<br />
+</ul>
+<input type="hidden" name="sort_order" id="sort_order" value=$ll /> 
+<input type="submit" name="prioritize" value="prioritize" class="button" />
+</form>
+
+<script type="text/javascript">
+
+
+/* when the DOM is ready */
+jQuery(document).ready(function() {
+
+
+  /* grab important elements */
+  var sortInput = jQuery('#sort_order');
+  var list = jQuery('#sortable-list');
+  var submit = jQuery('#autoSubmit');
+  var messageBox = jQuery('#message-box');
+  /* create requesting function to avoid duplicate code */
+
+
+  /* worker function */
+  var fnSubmit = function(save) {
+    var sortOrder = [];
+    list.children('li').each(function(){
+      sortOrder.push(jQuery(this).data('id'));
+    });
+    sortInput.val(sortOrder.join(','));
+    console.log(sortInput.val());
+    if(save) {
+      request();
+    }
+  };
+  /* store values */
+  list.children('li').each(function() {
+    var li = jQuery(this);
+    li.data('id',li.attr('title')).attr('title','');
+  });
+  /* sortables */
+  list.sortable({
+    opacity: 0.7,
+    update: function() {
+      fnSubmit(submit[0].checked);
+    }
+  });
+  list.disableSelection();
+
+  jQuery('#dd-form').bind('submit',function(e) {
+    if(e) e.preventDefault();
+    fnSubmit(true);
+  });
+
+});
+
+
+</script>
+
+
+</body>

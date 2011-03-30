@@ -1,0 +1,52 @@
+$def with (actions)
+<!DOCTYPE html>
+
+<head>
+	<link rel="shortcut icon" href="/static/favicon.ico" />
+	<title>QTP Runner</title>
+	<link rel="stylesheet" type="text/css" href="/templates/ex1.css" />
+	<script type='text/javascript' src='/scripts/jquery-1.5.js'></script>
+	<script type='text/javascript' src='/scripts/script.js'></script>
+</head>
+<body>
+
+
+<br />
+<form name="reset" method="post" action="reset">
+<input type="submit" name="reset" value="Reset All" />
+</form>
+
+
+<table id="actionlist">
+  <tr><th>Action Name</th><th>To Run</th><th>Action Location</th><th>Priority</th><th>Run Status</th><th>Last Run</th></tr>
+$code:
+   x = 0
+   env = {1:'qa', 2:'stg', 3:'prod', 0:'--'}
+$for action in actions:
+   $code:
+      x = x + 1 #keep a counter of actions
+     <tr><td id="t$action.actionid">$action.action_name</td><td><b>$env[action.Torun]</b></td><td>$action.action_loc</td><td>$action.priority</td><td>$action.status</td><td>$action.timeRun</td></tr>
+</table>
+
+
+<form method="post" action="add">
+<p><table>
+   <tr><th><label for="action_name">action name</label></th><td><input type="text" name="action_name" /></td></tr>
+   <tr><th><label for="action_loc">action location</label></th><td><input type="text" name="action_loc" /></td></tr>
+   <input type="hidden" name="action_priority" value=$x />
+   <tr><th><label for="add"></label></th><td><input type="submit" name="add" value="Add" /></td></tr>
+   </table>
+</p>
+</form>
+
+
+<script type='text/javascript'>
+jQuery(document).ready(function(){
+  jQuery('#actionlist tr:first').css('background-color', '#dddddd');
+  jQuery('#actionlist tr:odd').css('background-color', '#fff');
+  jQuery('#actionlist tr td:contains("failed")').css('background-color', '#FF0011');
+  jQuery('#actionlist tr td:contains("running...")').css('background-color', '#00EE00');	
+});
+</script>
+
+</body>

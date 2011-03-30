@@ -1,0 +1,332 @@
+"""This script will extract results from qtp's Results.xml and
+generate a custom html report"""
+
+import xml.dom.minidom
+from genshi.template import TemplateLoader
+import os
+import time
+import shutil
+import re
+import string
+import sys
+import sqlite3
+
+if len(sys.argv) > 1: 
+#checking if the script was called with argumentsto be passed to specified which test this is for)
+    test_in = sys.argv[1]
+else:
+    test_in = 'regression_main' #if no arguments passed assume regression main
+
+curPath     = 'V:\\regression_results\\' + test_in
+writeto_dir = 'V:\\regression_results\\' + test_in + '\\'
+resPath     = 'V:\\test_res2\\current\\'
+templates_dir1 = 'V:\\result_tamplates'
+db_loc = 'v:\\data\\test.db'
+
+
+#********************************Functions Start*************************************************
+
+#The following scripts make files and directory operations
+def get_timeStamp(dirpath):
+    """This function gets the file's time stamp inside dirpath"""
+    jFiles = get_all_files(dirpath)
+    if len(jFiles) != 0 :
+        filepath = dirpath + '\\' + jFiles[0]
+        timestmp =  time.localtime(os.path.getmtime(filepath))
+        return time.strftime("%Y%b%d-%H%M%S", timestmp)
+    else:
+        return "NoFilesInside_" + time.strftime("%Y%b%d-%H%M%S", time.localtime())
+
+def get_all_files(dirpath):
+    """This function returns all files inside dirpath"""
+    curFiles = os.listdir(dirpath)
+    justFiles = []
+    for eachfile in curFiles:
+        if os.path.isfile(dirpath + "\\" + eachfile):
+            justFiles.append(eachfile)
+    return justFiles
+
+def get_last_res(pathh):
+    listk = os.listdir(pathh)
+    """This function returns the dir name of the latest qtp Results i.e., Res20"""
+    list2 = []
+    p = re.compile('Res\d+')
+    for eachRes in listk:
+        if os.path.isdir(pathh+"\\"+eachRes): #checking if it is directory
+            if p.match(eachRes):
+                list2.append(eachRes)
+    list3 = []
+    for l2 in list2:
+        list3.append(string.atoi(l2.lstrip('Res')))
+    list3.sort()
+    return 'Res' + str(list3[len(list3)-1])
+
+#The following functions do xml parsing.
+
+def get_document(name):
+    """This function parses the xml doucments and returns it"""
+    return xml.dom.minidom.parse(name)
+
+def get_mainsummary(doc):
+    """This function returns the main Summary node in Results.xml"""
+    docNode = doc.getElementsByTagName('Doc')
+    docChildNodes = docNode[0].getElementsByTagName("Summary")
+    for docChildNode in docChildNodes:
+        summaryNode = docChildNode
+    return summaryNode
+
+def fetch_fromMainSummary(mainSummary, what):
+    """This funciton fetches number of passes/fails/waringins/time stamp etc from the main summary"""
+    fetched = mainSummary.attributes[what]
+    return fetched.value    
+
+def get_docNode(doc):
+    """This funciton returns the a collection of actions objects"""
+    docNodes =  doc.getElementsByTagName('Doc')
+    return docNodes[0]
+
+def get_actionNodes(docNode):
+    """This function returns all the action Nodes"""
+    return docNode.getElementsByTagName('Action')
+
+def get_failedActions(actionNodes):
+    """This function returns all the failed actions"""
+    failNodes = list()
+    for aNode in actionNodes:
+        summs = aNode.getElementsByTagName('Summary')
+        summ = summs[0]
+        if summ.attributes["failed"].value != "0":
+            failNodes.append(aNode)        
+    return failNodes
+        
+def get_immediateNodes(actionNode, nodeName):
+    """This function returns the immediate children node of 'nodeName' within the action"""
+    allchildren = actionNode.childNodes
+    if len(allchildren) == 0: #checking if the node has no children
+        return list()
+    else:        
+        stepNodes = list()
+        for eachchild in allchildren:
+            if eachchild.nodeName == nodeName:
+                stepNodes.append(eachchild)
+        return stepNodes
+
+def get_stepStatus(Step):
+    """This function returns the status of a step (Pass or Fail)"""
+    nodeArgs = get_immediateNodes(Step, 'NodeArgs')
+    if nodeArgs[0].hasAttribute('status'):
+        return nodeArgs[0].attributes["status"].value
+    else:
+        return None
+
+def get_FailedSteps(parentNode):
+    """This function returns all immediate child failed steps inside the parent node
+    be it an action or parent Step"""
+    failedSteps = list()
+    allchildSteps = get_immediateNodes(parentNode, 'Step')
+    for eachstep in allchildSteps:
+        if get_stepStatus(eachstep)== "Failed":
+            failedSteps.append(eachstep)
+    return failedSteps
+
+def check_if_fail_leaf(failNode):
+    """this function returns boolean value of whether the node is the last fail node in tree"""
+    childfailLeafs = get_FailedSteps(failNode)
+    if len(childfailLeafs) == 0:
+        return True
+    else:
+        return False
+
+def get_all_fail_leafs(node, startlist):
+    """this function returns all fail leaf nodes under a node"""
+    if check_if_fail_leaf(node): #checking if it is already a leaf node
+        string_val = node.childNodes[3].childNodes[0].nodeValue
+        startlist.append(string_val[0:200]) #then append the node value
+    imfailedNodes = get_FailedSteps(node)
+    for imfailedNode in imfailedNodes:
+        get_all_fail_leafs(imfailedNode,startlist) #recursively keep appending leaf nodes
+    return startlist
+    
+def replace_xmlspc(string):
+    """this function replaces the xml special chars in a string using RegEx"""
+    import re
+    m = string
+    spcchars = {'<': '&lt;',  '&':'&amp;', '>':'&gt;', '"':'&quot;', "'":'&apos;', '  **@@ : ':'<BR>'}
+    for key in spcchars.iterkeys():
+        p = re.compile(spcchars[key])
+        m = p.sub(key,m)
+    return m
+
+def wait_print_time(wait):
+    """ this function wait and print the counting down secs 
+    to the console.
+    """
+    for i in range (wait+1):
+        time.sleep (1)
+        rem_sec = wait - i
+        if (rem_sec < 40) | (rem_sec % 10 == 0):
+            print "\rpython results scripts starting in seconds: ", 
+            print "%s  " % (str(rem_sec)),
+    print "\r Blast off!!                                           "
+
+
+def wait_till_completed(db_loc):
+    """this function will keep waiting until the all
+    the actions that are set to run have status completed.
+    """
+    conn = sqlite3.connect(db_loc)
+    sql = """select actionid from actions 
+    where status != 'completed' OR status is null 
+    Intersect select actionid from actions where torun != 0;"""
+    c = conn.cursor()
+    c.execute(sql)
+    timeout = 0
+    run_res_gen = True #we want to run the result gen but need to wait till completion
+    while (c.fetchone() != None):
+        conn.close()
+        print "\rwaiting ",
+        print "%s   " % (str(timeout)),
+        time.sleep (20) #wait 3600 (20x180) secs
+        timeout += 1
+        conn = sqlite3.connect(db_loc)
+        c = conn.cursor()
+        c.execute(sql)
+        if timeout > 180: # if timeout execeeds and still not done, don't run.
+            print "too late..timeout exceeds"
+            run_res_gen = False
+            break
+    return run_res_gen
+
+#***********************************Functions End************************************************************
+if __name__ == "__main__":
+    if wait_till_completed(db_loc): # run only if all completed (true.)
+        wait_print_time(20)
+        envtxt= "" #getting env info for the old results for creating history
+        if os.path.exists(writeto_dir+'env.txt') :
+            envFi = open(writeto_dir + 'env.txt', 'r')
+            envtxt = envFi.readline()
+            envFi.close()
+
+        timeS = get_timeStamp(curPath)
+        destpath = curPath + "\\hist\\" + envtxt + timeS
+        os.mkdir(destpath)
+        all_curFiles = get_all_files(curPath)
+        os.chdir(curPath)
+        for eachfile in  all_curFiles: #moving files to the history dir
+            shutil.copy(eachfile, destpath)
+            os.remove(eachfile)
+
+        machines = ['QALAB1', 'QALAB2', 'HUNGRY']
+        summaryNodes = []
+        actionNodes = []
+        for machine in machines:
+            xmlfile_name = resPath + machine + "\\Report\\Results.xml"
+            if os.path.exists(xmlfile_name): #checking if result xml file exists            
+                doc      = get_document(xmlfile_name)
+                summaryNodes.append(get_mainsummary(doc))
+                docNode  = get_docNode(doc)
+                actionNodes = actionNodes + get_actionNodes(docNode)
+
+
+        failedActions = get_failedActions(actionNodes)
+
+        #writing environment info to a file
+        if len (actionNodes[0].childNodes[3].childNodes[3].childNodes) != 0:
+            txtEnv = actionNodes[0].childNodes[3].childNodes[3].childNodes[0].nodeValue
+        else:
+            txtEnv = "ENVIRONMENT=Env_not_found_in_result_xml"
+
+        del actionNodes
+        del docNode
+        del doc
+
+        splitList = txtEnv.split('=')
+        envInfo = splitList[len(splitList)-1]
+        envInfo = envInfo.strip()
+        ff = open(writeto_dir + 'env.txt', 'w')
+        ff.write(envInfo)
+        ff.close()
+
+        failActs = list()
+        for failedAction in failedActions:
+            failActs.append(failedAction.childNodes[1].childNodes[0].nodeValue)
+
+        fails = passes = warnings = 0
+        for summaryN in summaryNodes:
+            fails    += int(fetch_fromMainSummary(summaryN, "failed"))
+            passes   += int(fetch_fromMainSummary(summaryN, "passed"))
+            warnings += int(fetch_fromMainSummary(summaryN, "warnings"))
+
+        fails = str(fails)
+        passes = str(passes)
+        warnings = str(warnings)
+
+        stime    = fetch_fromMainSummary(summaryN, "sTime")
+        endtime  = fetch_fromMainSummary(summaryN, "eTime")
+        diction = {'failsAs':failActs, 'passes':passes,'fails':fails, 'warnings':warnings,
+                   'endtime':endtime, 'stime':stime, 'envInfo':envInfo, 'test':test_in}
+
+        #test printing to the logs
+        for fa in failActs:
+            print fa
+        print "number of Fails: " + fails
+        print "number of Passes: " + passes
+        print "number of warnings: " + warnings
+
+
+        #The following code renders html using Template file
+        loader = TemplateLoader([templates_dir1])
+        tmpl = loader.load('Template.xhtml')
+        stream = tmpl.generate(results = diction)
+        out_string = stream.render()
+        out_filename = "QTP_Results.html"
+        file = open(writeto_dir + out_filename, 'w')
+        file.write(out_string)
+        file.close()
+        
+
+    # each of fail action generate html page with their failed steps
+    for failedAction in failedActions: 
+        recurfailsteps = get_all_fail_leafs(failedAction, list())
+        failstepnames = list()
+        for failstep in recurfailsteps:
+            nodeDetail = replace_xmlspc(failstep) #strip xml special chars
+            failstepnames.append(nodeDetail) 
+        actionname = failedAction.childNodes[1].childNodes[0].nodeValue
+        #***printing to log
+        for failstepname in failstepnames:
+            print actionname + ":" + failstepname    
+        #***
+        actiondiction = {'failsteps':failstepnames, 'actionname':actionname}
+        acttmpl = loader.load('actionTemplate.xhtml')
+        actionstream = acttmpl.generate(action = actiondiction)
+        outact_string = actionstream.render()
+        action_namefile = actionname + ".html"
+        actionfile = open(writeto_dir + action_namefile, 'w')
+        actionfile.write(outact_string)
+        actionfile.close()
+
+
+    #Sending result page as Email
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+    server = 'qaoutmail.nti.notification.com'
+    session = smtplib.SMTP(server)
+    sender = 'qatest@blackboardconnect.com'
+    recipients = ['Yan.Aung@blackboardconnect.com'] #',
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "Results for: " + test_in
+    msg['From'] = sender
+    msg['To'] = ';'.join(recipients)
+    mainpage_html = out_string
+    html_txt = MIMEText(mainpage_html, 'html')
+    msg.attach(html_txt)
+    session.sendmail(sender,recipients, msg.as_string())
+    session.quit()
+
+    
+
+
+
+

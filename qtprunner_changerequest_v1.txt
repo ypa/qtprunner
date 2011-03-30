@@ -1,0 +1,4 @@
+change request to qtp runner
+
+- reset failed actions (this way we can only rerun the failed actions)
+- different color cues for failed actions. (javascript)

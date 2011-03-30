@@ -1,0 +1,14 @@
+a:hover 
+{BACKGROUND-COLOR: ffff66;}
+h1 {background-color:#BF3030}
+p {background-color: #e0ffff}
+#actionlist tbody tr td{
+  background-color: ;
+  }
+#actionlist tbody tr.odd td{
+  background-color: #fff;
+ }
+
+body {background-color:#EFFBFB} 
+
+

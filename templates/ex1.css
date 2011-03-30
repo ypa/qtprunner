@@ -1,0 +1,16 @@
+a:hover 
+{BACKGROUND-COLOR: ffff66;}
+h1 {background-color:#BF3030}
+p {background-color: #e0ffff}
+#actionlist tbody tr td{
+  background-color: ;
+  }
+#actionlist tbody tr.odd td{
+  background-color: #fff;
+ }
+
+body {background-color:#EFFBFB} 
+
+#sortable-list    { padding:0; }
+#sortable-list li { padding:4px 8px; color:#000; cursor:move; list-style:none; width:700px;  background:#ddd; margin:10px 0; border:1px solid #999; }
+#message-box    { background:#fffea1; border:2px solid #fc0; padding:4px 8px; margin:0 0 14px 0; width:500px; }
