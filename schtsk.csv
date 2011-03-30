@@ -1,3 +1,3 @@
 Machine,User,Pwd,SC,TN,RU,RP
-QALAB1,BBBB\yaung,I0ther@1,ONCE,run_qtp_qalab1,BBBB\yaung,I0ther@1
-QALAB2,BBBB\yaung,I0ther@1,ONCE,run_qtp_qalab2,BBBB\yaung,I0ther@1
+QALAB1,BBBB\yaung,,ONCE,run_qtp_qalab1,BBBB\yaung,
+QALAB2,BBBB\yaung,,ONCE,run_qtp_qalab2,BBBB\yaung,
